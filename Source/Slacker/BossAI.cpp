@@ -17,6 +17,9 @@ ABossAI::ABossAI()
 	GetCharacterMovement()->MaxWalkSpeed = PatrolSpeed;
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+	// Safe init — ensures timeout check doesn't fire before Escort actually starts
+	EscortEnterTime = -99999.0f;
 }
 
 void ABossAI::BeginPlay()
@@ -84,6 +87,18 @@ void ABossAI::OnSeePlayer(APawn* Pawn)
 	TargetPlayer = Pawn;
 	CurrentState = EBossState::Chase;
 	GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
+
+	// Start player running animation when chase begins
+	if (PlayerChar && PlayerRunMontage)
+	{
+		if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
+		{
+			if (!AnimInst->Montage_IsPlaying(PlayerRunMontage))
+			{
+				AnimInst->Montage_Play(PlayerRunMontage);
+			}
+		}
+	}
 }
 
 void ABossAI::ChaseLogic(float DeltaTime)
@@ -103,12 +118,34 @@ void ABossAI::ChaseLogic(float DeltaTime)
 
 	AIControllerRef->MoveToActor(TargetPlayer, 100.0f, true, true, true);
 
+	// Keep player running animation playing during entire chase
+	if (PlayerChar && PlayerRunMontage)
+	{
+		if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
+		{
+			if (!AnimInst->Montage_IsPlaying(PlayerRunMontage))
+			{
+				AnimInst->Montage_Play(PlayerRunMontage);
+			}
+		}
+	}
+
 	float Dist = FVector::Dist2D(GetActorLocation(), TargetPlayer->GetActorLocation());
 	if (Dist < 180.0f)
 	{
 		CurrentState = EBossState::Escort;
 		GetCharacterMovement()->MaxWalkSpeed = EscortSpeed;
-		AIControllerRef->StopMovement();
+		// CRITICAL: record the time we entered Escort, so timeout check works correctly
+		EscortEnterTime = GetWorld()->GetTimeSeconds();
+
+		// Stop player running animation when caught
+		if (PlayerChar && PlayerRunMontage)
+		{
+			if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
+			{
+				AnimInst->Montage_Stop(0.25f, PlayerRunMontage);
+			}
+		}
 	}
 }
 
@@ -141,7 +178,6 @@ void ABossAI::EscortLogic(float DeltaTime)
 		PlayerChar->GetCharacterMovement()->SetMovementMode(MOVE_None);
 		PlayerChar->SetActorEnableCollision(false);
 
-		// Play being-carried animation on player
 		if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
 		{
 			if (CarriedMontage && !AnimInst->Montage_IsPlaying(CarriedMontage))
@@ -151,13 +187,36 @@ void ABossAI::EscortLogic(float DeltaTime)
 		}
 	}
 
-	float DistToSeat = FVector::Dist2D(GetActorLocation(), Seat->GetActorLocation());
+	// Timeout: teleport player directly to seat if stuck for too long
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - EscortEnterTime > 10.0f)
+	{
+		if (PlayerChar)
+		{
+			PlayerChar->SetActorEnableCollision(true);
+			if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
+			{
+				AnimInst->StopAllMontages(0.0f);
+			}
+			// Teleport player directly to seat and force sit
+			Seat->ForceSit(PlayerChar);
+		}
 
+		CurrentState = EBossState::Patrol;
+		TargetPlayer = nullptr;
+		GetCharacterMovement()->MaxWalkSpeed = PatrolSpeed;
+		if (AIControllerRef)
+		{
+			AIControllerRef->StopMovement();
+		}
+		return;
+	}
+
+	float DistToSeat = FVector::Dist2D(GetActorLocation(), Seat->GetActorLocation());
 	if (DistToSeat < 200.0f)
 	{
 		if (PlayerChar)
 		{
-			// Must stop carried montage BEFORE ForceSit/Sit plays sit montage
 			if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
 			{
 				AnimInst->StopAllMontages(0.0f);
@@ -176,12 +235,13 @@ void ABossAI::EscortLogic(float DeltaTime)
 		return;
 	}
 
+	// Direct movement toward seat — reliable, ensure chair is in open area
 	FVector Dir = Seat->GetActorLocation() - GetActorLocation();
 	Dir.Z = 0.0f;
 	Dir.Normalize();
-
 	AddMovementInput(Dir);
 
+	// Carry player in front of BOSS
 	if (PlayerChar)
 	{
 		FVector CarryPos = GetActorLocation() + GetActorForwardVector() * 60.f;
@@ -192,6 +252,19 @@ void ABossAI::EscortLogic(float DeltaTime)
 
 void ABossAI::ReturnToPatrol()
 {
+	// Stop player running animation when chase ends
+	if (TargetPlayer)
+	{
+		ACharacter* PlayerChar = Cast<ACharacter>(TargetPlayer);
+		if (PlayerChar && PlayerRunMontage)
+		{
+			if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
+			{
+				AnimInst->Montage_Stop(0.25f, PlayerRunMontage);
+			}
+		}
+	}
+
 	CurrentState = EBossState::Patrol;
 	TargetPlayer = nullptr;
 	GetCharacterMovement()->MaxWalkSpeed = PatrolSpeed;

@@ -72,6 +72,13 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* CarriedMontage;
 
+	// Player's running montage ¡ª played when BOSS starts chasing
+	UPROPERTY(EditAnywhere, Category = "Animation")
+	UAnimMontage* PlayerRunMontage;
+
+	float LastEscortMoveTime = 0.0f;
+	float EscortEnterTime = -99999.0f;
+
 	void PatrolLogic(float DeltaTime);
 	void ChaseLogic(float DeltaTime);
 	void EscortLogic(float DeltaTime);

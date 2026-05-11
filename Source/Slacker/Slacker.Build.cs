@@ -1,7 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 using UnrealBuildTool;
-
 public class Slacker : ModuleRules
 {
 	public Slacker(ReadOnlyTargetRules Target) : base(Target)
