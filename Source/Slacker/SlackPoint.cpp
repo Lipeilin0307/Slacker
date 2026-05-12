@@ -26,7 +26,7 @@ void ASlackPoint::BeginPlay()
     InteractionBox->OnComponentBeginOverlap.AddDynamic(this, &ASlackPoint::OnOverlapBegin);
     InteractionBox->OnComponentEndOverlap.AddDynamic(this, &ASlackPoint::OnOverlapEnd);
 
-    // Hide the slack progress bar at game start
+    // Hide progress bar at game start
     ASlackerGameMode* GM = Cast<ASlackerGameMode>(GetWorld()->GetAuthGameMode());
     if (GM && GM->HUDWidget)
     {
@@ -93,8 +93,7 @@ void ASlackPoint::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* Ot
         bPlayerNearby = true;
         if (!bCompleted)
         {
-            ASlackerGameMode* GM = Cast<ASlackerGameMode>(GetWorld()->GetAuthGameMode());
-            if (GM) GM->ShowInteractText(TEXT("Press E to Slack"));
+            ShowInteractPrompt();
         }
     }
 }
@@ -105,12 +104,21 @@ void ASlackPoint::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* Othe
     if (Char && Char->IsPlayerControlled())
     {
         bPlayerNearby = false;
-
-        ASlackerGameMode* GM = Cast<ASlackerGameMode>(GetWorld()->GetAuthGameMode());
-        if (GM) GM->HideInteractText();
-
+        HideInteractPrompt();
         StopSlack();
     }
+}
+
+void ASlackPoint::ShowInteractPrompt()
+{
+    ASlackerGameMode* GM = Cast<ASlackerGameMode>(GetWorld()->GetAuthGameMode());
+    if (GM) GM->ShowInteractText(TEXT("Press E to Slack"));
+}
+
+void ASlackPoint::HideInteractPrompt()
+{
+    ASlackerGameMode* GM = Cast<ASlackerGameMode>(GetWorld()->GetAuthGameMode());
+    if (GM) GM->HideInteractText();
 }
 
 void ASlackPoint::StartSlack()

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
@@ -72,9 +72,11 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* CarriedMontage;
 
-	// Player's running montage ¡ª played when BOSS starts chasing
 	UPROPERTY(EditAnywhere, Category = "Animation")
 	UAnimMontage* PlayerRunMontage;
+
+	UPROPERTY(EditAnywhere, Category = "Animation")
+	UAnimMontage* PlayerWalkMontage;
 
 	float LastEscortMoveTime = 0.0f;
 	float EscortEnterTime = -99999.0f;
@@ -84,4 +86,5 @@ private:
 	void EscortLogic(float DeltaTime);
 	void ReturnToPatrol();
 	void UpdateBossAnimation();
+	void UpdatePlayerWalkAnimation();
 };

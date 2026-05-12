@@ -12,34 +12,30 @@ class SLACKER_API ASlackPoint : public AActor
 public:
     ASlackPoint();
 
-    UPROPERTY(VisibleAnywhere, Category = "Slack")
+    virtual void Tick(float DeltaTime) override;
+
+    UPROPERTY(VisibleAnywhere, Category = "SlackPoint")
     class UStaticMeshComponent* PointMesh;
 
-    UPROPERTY(VisibleAnywhere, Category = "Slack")
+    UPROPERTY(VisibleAnywhere, Category = "SlackPoint")
     class UBoxComponent* InteractionBox;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Slack")
-    float Progress = 0.0f;
+    UPROPERTY(EditAnywhere, Category = "SlackPoint")
+    float SlackDuration = 3.0f;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Slack")
+    UPROPERTY(BlueprintReadOnly, Category = "SlackPoint")
     bool bSlacking = false;
 
-    UPROPERTY(BlueprintReadOnly, Category = "Slack")
+    UPROPERTY(BlueprintReadOnly, Category = "SlackPoint")
     bool bCompleted = false;
 
+    UPROPERTY(BlueprintReadOnly, Category = "SlackPoint")
     bool bPlayerNearby = false;
 
-    UPROPERTY(EditAnywhere, Category = "Slack")
-    float SlackDuration = 5.0f;
+    float Progress = 0.0f;
 
-    UFUNCTION(BlueprintCallable, Category = "Slack")
-    void StartSlack();
-
-    UFUNCTION(BlueprintCallable, Category = "Slack")
-    void StopSlack();
-
-    UFUNCTION(BlueprintCallable, Category = "Slack")
-    void CompleteSlack();
+protected:
+    virtual void BeginPlay() override;
 
     UFUNCTION()
     void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -47,9 +43,12 @@ public:
     UFUNCTION()
     void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+    void StartSlack();
+    void StopSlack();
+    void CompleteSlack();
     void CheckInput();
 
-protected:
-    virtual void Tick(float DeltaTime) override;
-    virtual void BeginPlay() override;
+private:
+    void ShowInteractPrompt();
+    void HideInteractPrompt();
 };

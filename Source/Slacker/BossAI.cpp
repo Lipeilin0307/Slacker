@@ -2,6 +2,7 @@
 #include "Perception/PawnSensingComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "AIController.h"
+#include "GameFramework/PlayerController.h"
 #include "Seat.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -18,7 +19,6 @@ ABossAI::ABossAI()
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 
-	// Safe init — ensures timeout check doesn't fire before Escort actually starts
 	EscortEnterTime = -99999.0f;
 }
 
@@ -53,6 +53,7 @@ void ABossAI::Tick(float DeltaTime)
 	}
 
 	UpdateBossAnimation();
+	UpdatePlayerWalkAnimation();
 }
 
 void ABossAI::PatrolLogic(float DeltaTime)
@@ -88,12 +89,12 @@ void ABossAI::OnSeePlayer(APawn* Pawn)
 	CurrentState = EBossState::Chase;
 	GetCharacterMovement()->MaxWalkSpeed = ChaseSpeed;
 
-	// Start player running animation when chase begins
-	if (PlayerChar && PlayerRunMontage)
+	if (PlayerChar)
 	{
+		PlayerChar->GetCharacterMovement()->MaxWalkSpeed = 1000.0f;
 		if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
 		{
-			if (!AnimInst->Montage_IsPlaying(PlayerRunMontage))
+			if (PlayerRunMontage && !AnimInst->Montage_IsPlaying(PlayerRunMontage))
 			{
 				AnimInst->Montage_Play(PlayerRunMontage);
 			}
@@ -118,12 +119,11 @@ void ABossAI::ChaseLogic(float DeltaTime)
 
 	AIControllerRef->MoveToActor(TargetPlayer, 100.0f, true, true, true);
 
-	// Keep player running animation playing during entire chase
-	if (PlayerChar && PlayerRunMontage)
+	if (PlayerChar)
 	{
 		if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
 		{
-			if (!AnimInst->Montage_IsPlaying(PlayerRunMontage))
+			if (PlayerRunMontage && !AnimInst->Montage_IsPlaying(PlayerRunMontage))
 			{
 				AnimInst->Montage_Play(PlayerRunMontage);
 			}
@@ -135,10 +135,8 @@ void ABossAI::ChaseLogic(float DeltaTime)
 	{
 		CurrentState = EBossState::Escort;
 		GetCharacterMovement()->MaxWalkSpeed = EscortSpeed;
-		// CRITICAL: record the time we entered Escort, so timeout check works correctly
 		EscortEnterTime = GetWorld()->GetTimeSeconds();
 
-		// Stop player running animation when caught
 		if (PlayerChar && PlayerRunMontage)
 		{
 			if (UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance())
@@ -187,7 +185,6 @@ void ABossAI::EscortLogic(float DeltaTime)
 		}
 	}
 
-	// Timeout: teleport player directly to seat if stuck for too long
 	float CurrentTime = GetWorld()->GetTimeSeconds();
 	if (CurrentTime - EscortEnterTime > 10.0f)
 	{
@@ -198,7 +195,6 @@ void ABossAI::EscortLogic(float DeltaTime)
 			{
 				AnimInst->StopAllMontages(0.0f);
 			}
-			// Teleport player directly to seat and force sit
 			Seat->ForceSit(PlayerChar);
 		}
 
@@ -235,13 +231,11 @@ void ABossAI::EscortLogic(float DeltaTime)
 		return;
 	}
 
-	// Direct movement toward seat — reliable, ensure chair is in open area
 	FVector Dir = Seat->GetActorLocation() - GetActorLocation();
 	Dir.Z = 0.0f;
 	Dir.Normalize();
 	AddMovementInput(Dir);
 
-	// Carry player in front of BOSS
 	if (PlayerChar)
 	{
 		FVector CarryPos = GetActorLocation() + GetActorForwardVector() * 60.f;
@@ -252,7 +246,6 @@ void ABossAI::EscortLogic(float DeltaTime)
 
 void ABossAI::ReturnToPatrol()
 {
-	// Stop player running animation when chase ends
 	if (TargetPlayer)
 	{
 		ACharacter* PlayerChar = Cast<ACharacter>(TargetPlayer);
@@ -297,5 +290,39 @@ void ABossAI::UpdateBossAnimation()
 	if (TargetMontage && !AnimInst->Montage_IsPlaying(TargetMontage))
 	{
 		AnimInst->Montage_Play(TargetMontage);
+	}
+}
+
+void ABossAI::UpdatePlayerWalkAnimation()
+{
+	if (CurrentState == EBossState::Chase || CurrentState == EBossState::Escort)
+		return;
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC) return;
+
+	ACharacter* PlayerChar = Cast<ACharacter>(PC->GetPawn());
+	if (!PlayerChar || !PlayerWalkMontage) return;
+
+	if (PlayerChar->GetCharacterMovement()->MovementMode == MOVE_None)
+		return;
+
+	UAnimInstance* AnimInst = PlayerChar->GetMesh()->GetAnimInstance();
+	if (!AnimInst) return;
+
+	FVector Velocity = PlayerChar->GetVelocity();
+	Velocity.Z = 0.0f;
+	bool bIsMoving = Velocity.Size() > 10.0f;
+
+	if (bIsMoving)
+	{
+		if (!AnimInst->Montage_IsPlaying(PlayerWalkMontage))
+		{
+			AnimInst->Montage_Play(PlayerWalkMontage);
+		}
+	}
+	else if (AnimInst->Montage_IsPlaying(PlayerWalkMontage))
+	{
+		AnimInst->Montage_Stop(0.25f, PlayerWalkMontage);
 	}
 }

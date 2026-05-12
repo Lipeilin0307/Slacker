@@ -100,18 +100,12 @@ void ASeat::Sit(ACharacter* Character)
     Character->GetCharacterMovement()->SetMovementMode(MOVE_None);
     Character->SetActorLocation(GetActorLocation() + SitOffset);
 
-    // Play sitting animation (stop any ongoing montage first to prevent blending with carried animation)
     if (UAnimInstance* AnimInst = Character->GetMesh()->GetAnimInstance())
     {
-        AnimInst->StopAllMontages(0.0f); // stop immediately, no blending
+        AnimInst->StopAllMontages(0.0f);
         if (SitMontage)
         {
             AnimInst->Montage_Play(SitMontage);
-            UE_LOG(LogTemp, Warning, TEXT("Playing SitMontage (forced stop previous montages)"));
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("SitMontage is NULL! Assign AM_Player_Sit in editor."));
         }
     }
 }
@@ -120,13 +114,13 @@ void ASeat::StandUp()
 {
     if (!Occupant) return;
 
-    // Stop all montages (sitting / being carried)
     if (UAnimInstance* AnimInst = Occupant->GetMesh()->GetAnimInstance())
     {
         AnimInst->StopAllMontages(0.25f);
     }
 
     Occupant->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    Occupant->GetCharacterMovement()->MaxWalkSpeed = 200.0f;
     FVector StandPos = Occupant->GetActorLocation() + Occupant->GetActorForwardVector() * 100.0f;
     Occupant->SetActorLocation(StandPos);
 
